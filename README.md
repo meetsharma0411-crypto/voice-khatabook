@@ -1,3 +1,4 @@
+
 # Keshav AI Voice KhataBook
 
 Digital customer accounting for Keshav Dairy & Beverages. The repository is a monorepo; this initial scaffold contains the Django REST API only. The Flutter application will be added in a later phase.
@@ -38,3 +39,6 @@ The scaffold does not run migrations. Django's system check and migration comman
 - `mobile/`: reserved for the future Flutter application; not created in Phase 1A.
 
 See [docs/database-design.md](docs/database-design.md) for the proposed tables, relationships, ledger rules, and deletion policy.
+=======
+# voice-khatabook
+
