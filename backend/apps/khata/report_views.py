@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 
 from apps.customers.models import Customer
 
+from .entry_serializers import LedgerHistorySerializer
 from .models import LedgerEntry
 
 
@@ -51,7 +52,15 @@ def _summary_data():
 
 class DashboardView(APIView):
     def get(self, request):
-        return Response(_summary_data())
+        recent = LedgerEntry.objects.filter(
+            status=LedgerEntry.Status.POSTED
+        ).select_related(
+            "customer", "reversal_of", "reversal_entry", "created_by"
+        ).order_by("-transaction_date", "-created_at", "-id")[:10]
+        return Response({
+            **_summary_data(),
+            "recent_transactions": LedgerHistorySerializer(recent, many=True).data,
+        })
 
 
 class SummaryReportView(APIView):

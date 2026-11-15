@@ -6,7 +6,8 @@ from rest_framework import serializers
 from apps.catalog.models import Product
 from apps.customers.models import Customer
 
-from .models import KhataTransaction, KhataTransactionItem
+from .entry_serializers import LedgerReversalSerializer
+from .models import KhataTransaction, KhataTransactionItem, LedgerEntry
 
 
 class TransactionItemInputSerializer(serializers.Serializer):
@@ -34,6 +35,10 @@ class KhataTransactionSerializer(serializers.ModelSerializer):
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.filter(is_active=True))
     items = TransactionItemInputSerializer(many=True, write_only=True, required=True)
     line_items = TransactionItemOutputSerializer(many=True, source="items", read_only=True)
+    ledger_entry_id = serializers.IntegerField(read_only=True, allow_null=True)
+    is_reversed = serializers.SerializerMethodField()
+    reversal = serializers.SerializerMethodField()
+    net_balance_effect = serializers.SerializerMethodField()
 
     class Meta:
         model = KhataTransaction
@@ -46,6 +51,10 @@ class KhataTransactionSerializer(serializers.ModelSerializer):
             "items",
             "line_items",
             "total_amount",
+            "ledger_entry_id",
+            "is_reversed",
+            "reversal",
+            "net_balance_effect",
             "notes",
             "created_at",
             "updated_at",
@@ -55,9 +64,33 @@ class KhataTransactionSerializer(serializers.ModelSerializer):
             "status",
             "source",
             "total_amount",
+            "ledger_entry_id",
+            "is_reversed",
+            "reversal",
+            "net_balance_effect",
             "created_at",
             "updated_at",
         )
+
+    def _get_reversal(self, obj):
+        if not obj.ledger_entry_id:
+            return None
+        try:
+            return obj.ledger_entry.reversal_entry
+        except LedgerEntry.DoesNotExist:
+            return None
+
+    def get_is_reversed(self, obj):
+        return self._get_reversal(obj) is not None
+
+    def get_reversal(self, obj):
+        reversal = self._get_reversal(obj)
+        return LedgerReversalSerializer(reversal).data if reversal else None
+
+    def get_net_balance_effect(self, obj):
+        if not obj.ledger_entry_id or self._get_reversal(obj):
+            return "0.00"
+        return str(obj.total_amount)
 
     def validate_items(self, items):
         if not items:

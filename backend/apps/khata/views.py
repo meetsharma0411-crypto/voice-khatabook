@@ -20,7 +20,7 @@ class CustomerLedgerView(ListAPIView):
         return LedgerEntry.objects.filter(
             customer=self.customer,
             status=LedgerEntry.Status.POSTED,
-        ).select_related("customer")
+        ).select_related("customer", "reversal_entry")
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

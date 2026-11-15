@@ -11,9 +11,9 @@ from .transaction_serializers import KhataTransactionSerializer
 
 class KhataTransactionViewSet(viewsets.ModelViewSet):
     serializer_class = KhataTransactionSerializer
-    queryset = KhataTransaction.objects.select_related("customer", "ledger_entry").prefetch_related(
-        "items"
-    )
+    queryset = KhataTransaction.objects.select_related(
+        "customer", "ledger_entry", "ledger_entry__reversal_entry"
+    ).prefetch_related("items")
     http_method_names = ["get", "post", "head", "options"]
 
     @action(detail=True, methods=["post"])

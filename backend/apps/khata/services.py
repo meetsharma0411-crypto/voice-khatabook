@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 
 from apps.customers.models import Customer
@@ -82,6 +82,56 @@ def get_customer_balance(customer_id):
     return (totals["debits"] or Decimal("0.00")) - (totals["credits"] or Decimal("0.00"))
 
 
+def get_customer_activity_totals(customer_id):
+    """Return posted Udhaar/Jama totals using the same reversal rules as reports."""
+    posted = LedgerEntry.objects.filter(
+        customer_id=customer_id, status=LedgerEntry.Status.POSTED
+    )
+    totals = posted.aggregate(
+        udhaar=Sum(
+            "debit_amount",
+            filter=Q(entry_type__in=(LedgerEntry.EntryType.UDHAAR, LedgerEntry.EntryType.SALE)),
+        ),
+        udhaar_reversed=Sum(
+            "credit_amount",
+            filter=Q(
+                entry_type=LedgerEntry.EntryType.REVERSAL,
+                reversal_of__entry_type__in=(LedgerEntry.EntryType.UDHAAR, LedgerEntry.EntryType.SALE),
+            ),
+        ),
+        jama=Sum(
+            "credit_amount",
+            filter=Q(entry_type__in=(LedgerEntry.EntryType.JAMA, LedgerEntry.EntryType.PAYMENT)),
+        ),
+        jama_reversed=Sum(
+            "debit_amount",
+            filter=Q(
+                entry_type=LedgerEntry.EntryType.REVERSAL,
+                reversal_of__entry_type__in=(LedgerEntry.EntryType.JAMA, LedgerEntry.EntryType.PAYMENT),
+            ),
+        ),
+    )
+    zero = Decimal("0.00")
+    return {
+        "total_udhaar": (totals["udhaar"] or zero) - (totals["udhaar_reversed"] or zero),
+        "total_jama": (totals["jama"] or zero) - (totals["jama_reversed"] or zero),
+    }
+
+
+def preview_simple_entry(*, entry_id):
+    """Calculate a draft projection from posted ledger rows without posting it."""
+    entry = SimpleKhataEntry.objects.select_related("customer").get(pk=entry_id)
+    if entry.status != SimpleKhataEntry.Status.DRAFT:
+        raise DjangoValidationError("Only a draft entry can be previewed.")
+    previous_balance = get_customer_balance(entry.customer_id)
+    signed_amount = (
+        entry.amount
+        if entry.transaction_type == SimpleKhataEntry.TransactionType.UDHAAR
+        else -entry.amount
+    )
+    return entry, previous_balance, previous_balance + signed_amount
+
+
 @transaction.atomic
 def confirm_simple_entry(*, entry_id, actor=None):
     """Post a draft exactly once to the existing customer ledger."""
@@ -113,12 +163,27 @@ def confirm_simple_entry(*, entry_id, actor=None):
 
 
 @transaction.atomic
+def cancel_simple_entry(*, entry_id):
+    """Cancel a draft under a row lock without creating a ledger entry."""
+    entry = SimpleKhataEntry.objects.select_for_update().get(pk=entry_id)
+    if entry.status == SimpleKhataEntry.Status.CANCELLED:
+        return entry, False
+    if entry.status != SimpleKhataEntry.Status.DRAFT:
+        raise DjangoValidationError("Only a draft entry can be cancelled.")
+    entry.status = SimpleKhataEntry.Status.CANCELLED
+    entry.save(update_fields=("status", "updated_at"))
+    return entry, True
+
+
+@transaction.atomic
 def reverse_ledger_entry(*, ledger_entry_id, reason, actor=None):
     """Post one linked, opposite ledger row while preserving the original."""
     original = LedgerEntry.objects.select_for_update().get(pk=ledger_entry_id)
     Customer.objects.select_for_update().get(pk=original.customer_id)
     if original.status != LedgerEntry.Status.POSTED:
         raise DjangoValidationError("Only a posted ledger entry can be reversed.")
+    if original.entry_type == LedgerEntry.EntryType.REVERSAL:
+        raise DjangoValidationError("A reversal entry cannot itself be reversed.")
     if not reason or not reason.strip():
         raise DjangoValidationError({"reason": "Provide a reason for this correction."})
     if LedgerEntry.objects.filter(reversal_of=original).exists():

@@ -10,7 +10,7 @@ from apps.customers.models import Customer
 
 from .entry_serializers import LedgerHistorySerializer
 from .models import LedgerEntry
-from .services import get_customer_balance
+from .services import get_customer_activity_totals, get_customer_balance
 
 
 class CustomerTransactionsView(ListAPIView):
@@ -20,7 +20,7 @@ class CustomerTransactionsView(ListAPIView):
         self.customer = get_object_or_404(Customer, pk=self.kwargs["customer_id"])
         return LedgerEntry.objects.filter(
             customer=self.customer, status=LedgerEntry.Status.POSTED
-        ).select_related("customer", "reversal_of", "created_by")
+        ).select_related("customer", "reversal_of", "reversal_entry", "created_by")
 
     def list(self, request, *args, **kwargs):
         entries = self.filter_queryset(self.get_queryset())
@@ -42,6 +42,10 @@ class CustomerBalanceView(APIView):
                 "customer": customer.pk,
                 "customer_name": customer.name,
                 "balance": str(get_customer_balance(customer.pk)),
+                **{
+                    key: str(value)
+                    for key, value in get_customer_activity_totals(customer.pk).items()
+                },
                 "meaning": "positive means customer owes the business; negative means business owes the customer",
             }
         )

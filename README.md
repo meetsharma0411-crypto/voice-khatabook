@@ -1,13 +1,15 @@
 
 # Keshav AI Voice KhataBook
 
-Digital customer accounting for Keshav Dairy & Beverages. The repository is a monorepo; this initial scaffold contains the Django REST API only. The Flutter application will be added in a later phase.
+Digital customer accounting for Keshav Dairy & Beverages. This monorepo contains the Django REST API and Flutter Android application, including the Gemini-powered voice proposal workflow.
 
 ## Current scope
 
-- Phase 1A scaffold: Django project, REST Framework configuration, domain app packages, and database design notes.
+- Django REST Framework backend with customer, catalog, khata, authentication, and voice APIs.
+- Flutter Android app with customer, dashboard, manual Khata, and voice entry features.
+- Voice entries create a draft and preview; a user must confirm before the existing Khata service posts it.
 - Database: MariaDB provided by XAMPP, configured with environment variables.
-- No database migrations have been created or run as part of this scaffold.
+- Phase 6 migrations are generated but have not been applied to the MariaDB business database. Review `docs/voice-ai.md` before applying them.
 
 ## Backend setup (PowerShell)
 
@@ -36,9 +38,10 @@ The scaffold does not run migrations. Django's system check and migration comman
 - `backend/apps/`: business-domain Django applications.
 - `backend/requirements.txt`: backend Python dependencies.
 - `docs/`: architecture and data design.
-- `mobile/`: reserved for the future Flutter application; not created in Phase 1A.
+- `mobile/`: Flutter Android application, organized by feature.
 
 See [docs/database-design.md](docs/database-design.md) for the proposed tables, relationships, ledger rules, and deletion policy.
-=======
-# voice-khatabook
 
+# Voice AI
+
+Phase 6 voice integration setup, Gemini model/pricing references, endpoint flow, and pending migrations are documented in [docs/voice-ai.md](docs/voice-ai.md).

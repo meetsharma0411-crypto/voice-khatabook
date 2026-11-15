@@ -50,3 +50,25 @@ class ProductPrice(models.Model):
 
     def __str__(self):
         return f"{self.product}: {self.price} from {self.effective_from}"
+
+
+class ProductAlias(models.Model):
+    """A spoken, translated, or commonly typed name for a catalog product."""
+
+    class Language(models.TextChoices):
+        GUJARATI = "gu", "Gujarati"
+        HINDI = "hi", "Hindi"
+        ENGLISH = "en", "English"
+        HINGLISH = "hinglish", "Hinglish"
+        MIXED = "mixed", "Mixed"
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="aliases")
+    alias = models.CharField(max_length=160, unique=True)
+    language = models.CharField(max_length=12, choices=Language.choices, default=Language.ENGLISH)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["alias", "id"]
+
+    def __str__(self):
+        return f"{self.alias} → {self.product.name}"

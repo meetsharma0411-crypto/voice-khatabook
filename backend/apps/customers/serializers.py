@@ -3,11 +3,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.khata.models import LedgerEntry
+from apps.khata.services import get_customer_balance
 
 from .models import Customer
 
 
 class CustomerSerializer(serializers.ModelSerializer):
+    current_balance = serializers.SerializerMethodField()
     opening_balance_amount = serializers.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -31,6 +33,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "address",
             "notes",
             "is_active",
+            "current_balance",
             "opening_balance_amount",
             "opening_balance_side",
             "opening_balance_date",
@@ -62,6 +65,12 @@ class CustomerSerializer(serializers.ModelSerializer):
                 {"opening_balance_amount": "Enter a positive amount when specifying an opening balance date."}
             )
         return attrs
+
+    def get_current_balance(self, obj):
+        balance = getattr(obj, "current_balance", None)
+        if balance is None:
+            balance = get_customer_balance(obj.pk)
+        return f"{balance:.2f}"
 
     def create(self, validated_data):
         amount = validated_data.pop("opening_balance_amount", None)
